@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>BarkWorld Prototype</title>
+  <title>BarkWorld</title>
   <style>
     body {
       margin: 0;
@@ -24,6 +24,10 @@
       height: 40px;
       background: orange;
       border-radius: 50%;
+    }
+    .world-object:hover {
+      outline: 2px dashed red;
+      cursor: pointer;
     }
     #sidebar {
       width: 300px;
@@ -53,11 +57,24 @@
       color: white;
       cursor: pointer;
     }
+    #minimap {
+      position: absolute;
+      right: 10px;
+      bottom: 10px;
+      width: 120px;
+      height: 120px;
+      background: rgba(255,255,255,0.7);
+      border: 1px solid #aaa;
+      font-size: 10px;
+      overflow: auto;
+      z-index: 999;
+    }
   </style>
 </head>
 <body>
   <div id="world">
     <div id="player"></div>
+    <div id="minimap"></div>
   </div>
   <div id="sidebar">
     <div id="chat"></div>
@@ -68,11 +85,38 @@
   </div>
 
   <script>
-    const sys_message = `Ты помощник в виртуальном HTML-мире. Отвечай только HTML-элементами, которые нужно вставить в игровое поле. Без объяснений. Например: <div style='position:absolute; left:200px; top:150px;'>🌳</div>`;
+    const sys_message = `Ты помощник в виртуальном HTML-мире. Отвечай только HTML-элементами, которые нужно вставить в игровое поле. Без объяснений. Добавляй class='world-object' в каждый элемент.`;
     const chat = document.getElementById("chat");
     const input = document.getElementById("input");
     const send = document.getElementById("send");
     const world = document.getElementById("world");
+    const player = document.getElementById("player");
+    const minimap = document.getElementById("minimap");
+
+    const history = [];
+
+    let px = 100, py = 100;
+
+    function updatePlayer() {
+      player.style.left = px + "px";
+      player.style.top = py + "px";
+    }
+
+    document.addEventListener("keydown", (e) => {
+      const step = 10;
+      if (e.key === "w") py -= step;
+      if (e.key === "s") py += step;
+      if (e.key === "a") px -= step;
+      if (e.key === "d") px += step;
+      updatePlayer();
+    });
+
+    world.addEventListener("click", (e) => {
+      if (e.target.classList.contains("world-object")) {
+        world.removeChild(e.target);
+        saveWorld();
+      }
+    });
 
     async function talkToAI(message) {
       chat.innerHTML += `<div><b>Вы:</b> ${message}</div>`;
@@ -91,15 +135,14 @@
         const data = await res.json();
         const reply = data.choices?.[0]?.message?.content || "";
         chat.innerHTML += `<div><b>ИИ:</b> ${reply}</div>`;
-        try {
-          const el = document.createElement("div");
-          el.innerHTML = reply;
-          for (let child of el.children) {
-            world.appendChild(child);
-          }
-        } catch (e) {
-          console.error("Ошибка вставки HTML:", e);
+
+        const el = document.createElement("div");
+        el.innerHTML = reply;
+        for (let child of el.children) {
+          child.classList.add("world-object");
+          world.appendChild(child);
         }
+        saveWorld();
       } catch (e) {
         chat.innerHTML += `<div><b>Ошибка:</b> ${e.message}</div>`;
       }
@@ -116,6 +159,42 @@
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") send.click();
     });
+
+    function saveWorld() {
+      const html = world.innerHTML;
+      localStorage.setItem("savedWorld", html);
+      updateMinimap();
+      history.push(html);
+      if (history.length > 100) history.shift();
+    }
+
+    function loadWorld() {
+      const html = localStorage.getItem("savedWorld");
+      if (html) {
+        world.innerHTML = html;
+        world.appendChild(player);
+        world.appendChild(minimap);
+        bindObjects();
+      }
+    }
+
+    function updateMinimap() {
+      minimap.innerText = Array.from(world.querySelectorAll(".world-object"))
+        .map((el, i) => `${i+1}. ${el.outerHTML.slice(0, 40)}...`)
+        .join("\n");
+    }
+
+    function bindObjects() {
+      document.querySelectorAll(".world-object").forEach(obj => {
+        obj.onclick = (e) => {
+          world.removeChild(obj);
+          saveWorld();
+        };
+      });
+    }
+
+    loadWorld();
+    updatePlayer();
   </script>
 </body>
 </html>
