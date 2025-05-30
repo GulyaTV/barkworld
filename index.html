@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>BarkWorld Prototype</title>
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      height: 100vh;
+      font-family: sans-serif;
+    }
+    #world {
+      flex: 1;
+      position: relative;
+      background: #e0f7fa;
+      overflow: hidden;
+    }
+    #player {
+      position: absolute;
+      left: 100px;
+      top: 100px;
+      width: 40px;
+      height: 40px;
+      background: orange;
+      border-radius: 50%;
+    }
+    #sidebar {
+      width: 300px;
+      border-left: 2px solid #ccc;
+      display: flex;
+      flex-direction: column;
+    }
+    #chat {
+      flex: 1;
+      padding: 10px;
+      overflow-y: auto;
+      background: #f9f9f9;
+    }
+    #input-area {
+      display: flex;
+      border-top: 1px solid #ccc;
+    }
+    #input {
+      flex: 1;
+      padding: 8px;
+      border: none;
+    }
+    #send {
+      padding: 8px 12px;
+      border: none;
+      background: #2196f3;
+      color: white;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="world">
+    <div id="player"></div>
+  </div>
+  <div id="sidebar">
+    <div id="chat"></div>
+    <div id="input-area">
+      <input type="text" id="input" placeholder="Скажи что-то ИИ..." />
+      <button id="send">Отправить</button>
+    </div>
+  </div>
+
+  <script>
+    const sys_message = `Ты помощник в виртуальном HTML-мире. Отвечай только HTML-элементами, которые нужно вставить в игровое поле. Без объяснений. Например: <div style='position:absolute; left:200px; top:150px;'>🌳</div>`;
+    const chat = document.getElementById("chat");
+    const input = document.getElementById("input");
+    const send = document.getElementById("send");
+    const world = document.getElementById("world");
+
+    async function talkToAI(message) {
+      chat.innerHTML += `<div><b>Вы:</b> ${message}</div>`;
+      try {
+        const res = await fetch("https://gulya-openrouter.maxim11393.workers.dev", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "qwen/qwen3-30b-a3b:free",
+            messages: [
+              { role: "system", content: sys_message },
+              { role: "user", content: message },
+            ],
+          }),
+        });
+        const data = await res.json();
+        const reply = data.choices?.[0]?.message?.content || "";
+        chat.innerHTML += `<div><b>ИИ:</b> ${reply}</div>`;
+        try {
+          const el = document.createElement("div");
+          el.innerHTML = reply;
+          for (let child of el.children) {
+            world.appendChild(child);
+          }
+        } catch (e) {
+          console.error("Ошибка вставки HTML:", e);
+        }
+      } catch (e) {
+        chat.innerHTML += `<div><b>Ошибка:</b> ${e.message}</div>`;
+      }
+    }
+
+    send.onclick = () => {
+      const message = input.value.trim();
+      if (message) {
+        talkToAI(message);
+        input.value = "";
+      }
+    };
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") send.click();
+    });
+  </script>
+</body>
+</html>
